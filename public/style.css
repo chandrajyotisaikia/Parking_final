@@ -1,0 +1,86 @@
+/* style.css — Light blue & white theme */
+* { box-sizing: border-box; }
+:root { --btn-pad: 18px 16px; --btn-font: 18px; }
+body {
+  margin: 0;
+  font-family: -apple-system, Roboto, Arial, sans-serif;
+  background: #EAF3FB;
+  color: #0B2545;
+}
+.header {
+  background: #FFFFFF;
+  border-bottom: 3px solid #2563EB;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.logo { font-size: 22px; font-weight: 900; color: #2563EB; }
+.brand-sub { font-size: 13px; font-weight: 700; color: #0B2545; letter-spacing: 1px; margin-top: 2px; }
+.tag { font-size: 11px; color: #2563EB; opacity: 0.85; }
+.footer { text-align: center; padding: 20px; font-size: 12px; color: #6B87A8; border-top: 1px solid #CFE0F2; margin-top: 20px; }
+.container { padding: 16px; max-width: 500px; margin: 0 auto; }
+.card {
+  background: #FFFFFF;
+  border: 1px solid #CFE0F2;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(37,99,235,0.08);
+}
+label { display: block; font-size: 13px; font-weight: 700; color: #2563EB; margin-bottom: 6px; text-transform: uppercase; }
+input, select {
+  width: 100%;
+  padding: 16px;
+  font-size: 18px;
+  background: #F4F9FF;
+  border: 2px solid #CFE0F2;
+  border-radius: 8px;
+  color: #0B2545;
+  margin-bottom: 16px;
+}
+input:focus, select:focus { border-color: #2563EB; outline: none; }
+.type-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.type-btn {
+  flex: 1; padding: var(--btn-pad); text-align: center; border-radius: 10px;
+  border: 2px solid #CFE0F2; background: #F4F9FF; color: #0B2545; font-weight: 700; cursor: pointer;
+  font-size: var(--btn-font);
+}
+.type-btn.selected { background: #2563EB; color: #fff; border-color: #2563EB; }
+button.primary {
+  width: 100%; padding: var(--btn-pad); font-size: var(--btn-font); font-weight: 800;
+  background: #2563EB; color: #fff; border: none; border-radius: 10px; cursor: pointer;
+}
+button.scan {
+  width: 100%; padding: var(--btn-pad); font-size: var(--btn-font); font-weight: 800;
+  background: #FFFFFF; color: #2563EB; border: 2px solid #2563EB; border-radius: 10px; cursor: pointer; margin-bottom: 16px;
+}
+button.secondary {
+  padding: 10px 16px; background: #F4F9FF; color: #0B2545; border: 1px solid #CFE0F2; border-radius: 8px; cursor: pointer;
+}
+.result { padding: 16px; border-radius: 10px; margin-top: 16px; font-weight: 700; }
+.result.sub { background: #E3F7EA; border: 2px solid #16A34A; color: #0B2545; }
+.result.paid { background: #E7EFFC; border: 2px solid #2563EB; color: #0B2545; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab { flex: 1; padding: 14px; text-align: center; background: #FFFFFF; border: 1px solid #CFE0F2; border-radius: 8px; cursor: pointer; font-weight: 700; color: #0B2545; }
+.tab.active { background: #2563EB; color: #fff; border-color: #2563EB; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; padding: 10px; border-bottom: 2px solid #CFE0F2; color: #6B87A8; font-size: 12px; text-transform: uppercase; }
+td { text-align: left; padding: 10px; border-bottom: 1px solid #EAF3FB; }
+.expired { color: #DC2626; }
+.status { text-align: center; font-size: 14px; color: #4C6B8A; margin: 8px 0; }
+.summary-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.summary-card { flex: 1; min-width: 140px; background: #FFFFFF; border: 1px solid #CFE0F2; border-radius: 10px; padding: 16px; text-align: center; box-shadow: 0 1px 4px rgba(37,99,235,0.08); }
+.summary-card .label { font-size: 12px; color: #6B87A8; text-transform: uppercase; }
+.summary-card .value { font-size: 24px; font-weight: 900; margin-top: 6px; }
+.income { color: #16A34A; }
+.expense { color: #DC2626; }
+.net { color: #2563EB; }
+
+/* Minimal mode — toggled from the admin dashboard's Display Settings tab */
+body.minimal .card { box-shadow: none; border-color: #DCE8F5; background: #FBFDFF; }
+body.minimal .type-btn.selected { background: #E7EFFC; color: #2563EB; border-color: #2563EB; }
+body.minimal button.scan { background: #FFFFFF; color: #2563EB; border: 2px solid #2563EB; }
+body.minimal button.primary { background: #FFFFFF; color: #2563EB; border: 2px solid #2563EB; }
+body.minimal .header { border-bottom: 1px solid #CFE0F2; }

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Parking — Admin CRM</title>
+<link rel="stylesheet" href="/style.css?v=5">
+<style>
+  body { max-width: 900px; margin: 0 auto; }
+  .container { max-width: 900px; }
+  #loginScreen { max-width: 360px; margin: 80px auto; }
+  @media (min-width: 900px) {
+    .container { max-width: 1100px; padding: 32px; }
+    .summary-row { gap: 20px; }
+    .tabs { padding: 6px; gap: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">PARKPRO</div>
+    <div class="brand-sub">TULON'S PARKING</div>
+    <div class="tag">ADMIN CRM DASHBOARD</div>
+  </div>
+  <a href="/" onclick="sessionStorage.setItem('skipDesktopRedirect','true')" style="color:#F5C518; font-size:13px;">← Gate Entry</a>
+</div>
+
+<!-- LOGIN GATE -->
+<div id="loginScreen" class="container">
+  <div class="card">
+    <label>Admin Username</label>
+    <input type="text" id="loginUsername" placeholder="Username">
+    <label>Admin Password</label>
+    <input type="password" id="loginPassword" placeholder="Enter password">
+    <button class="primary" onclick="tryLogin()">Login</button>
+    <div id="loginError" style="color:#DC2626; margin-top:10px;"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD (hidden until login) -->
+<div id="dashboard" class="container" style="display:none">
+
+  <div class="summary-row">
+    <div class="summary-card"><div class="label">Total Income</div><div class="value income" id="sumIncome">₹0</div></div>
+    <div class="summary-card"><div class="label">Total Expenses</div><div class="value expense" id="sumExpense">₹0</div></div>
+    <div class="summary-card"><div class="label">Net</div><div class="value net" id="sumNet">₹0</div></div>
+    <div class="summary-card"><div class="label">Currently Parked</div><div class="value" style="color:#2563EB;" id="sumParked">0</div></div>
+    <div class="summary-card"><div class="label">Collectable Now</div><div class="value" style="color:#DC2626;" id="sumCollectable">₹0</div></div>
+    <div class="summary-card"><div class="label">Historical Dues</div><div class="value" style="color:#DC2626;" id="sumHistorical">₹0</div></div>
+  </div>
+
+  <div id="renewalBanner"></div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabEntries" onclick="showAdminTab('entries')">Recent Entries</div>
+    <div class="tab" id="tabSubs" onclick="showAdminTab('subs')">Subscribers</div>
+    <div class="tab" id="tabAddSub" onclick="showAdminTab('addsub')">Add Subscriber</div>
+    <div class="tab" id="tabExpenses" onclick="showAdminTab('expenses')">Expenses</div>
+    <div class="tab" id="tabExport" onclick="showAdminTab('export')">Download Data</div>
+    <div class="tab" id="tabDisplay" onclick="showAdminTab('display'); loadDisplaySettings();">Display Settings</div>
+    <div class="tab" id="tabGatekeepers" onclick="showAdminTab('gatekeepers'); loadGatekeepers();">Gatekeepers</div>
+  </div>
+
+  <div style="display:flex; justify-content:flex-end; margin-bottom:12px; font-size:13px;">
+    <a href="#" onclick="openAdminChangePassword(); return false;" style="color:#2563EB;">Change My Password</a>
+  </div>
+  <div id="adminChangePasswordCard" class="card" style="display:none;">
+    <label>Current Password</label>
+    <input type="password" id="adminOldPassword">
+    <label>New Password</label>
+    <input type="password" id="adminNewPassword">
+    <button class="primary" onclick="submitAdminChangePassword()">Update Password</button>
+    <button class="secondary" style="width:100%; margin-top:8px;" onclick="closeAdminChangePassword()">Cancel</button>
+    <div id="adminChangePasswordResult"></div>
+  </div>
+
+  <div id="entriesPanel" class="card">
+    <table><thead><tr><th>Plate</th><th>Type</th><th>Amount</th><th>Payment</th><th>Attendant</th><th>Time</th></tr></thead>
+      <tbody id="entriesBody"></tbody></table>
+  </div>
+
+  <div id="subsPanel" class="card" style="display:none">
+    <table><thead><tr><th>Plate</th><th>Owner</th><th>Phone</th><th>Expires</th><th>Amount</th><th>Status</th></tr></thead>
+      <tbody id="subsBody"></tbody></table>
+  </div>
+
+  <div id="addsubPanel" class="card" style="display:none">
+    <label>Vehicle Number</label><input type="text" id="newPlate" placeholder="e.g. AB01CD2345" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '')">
+    <label>Owner Name</label><input type="text" id="newOwner">
+    <label>Phone</label><input type="text" id="newPhone">
+    <label>Vehicle Type</label>
+    <select id="newType" onchange="updateSubAmountPreview()"><option value="CAR">Car</option><option value="BIKE">Bike</option></select>
+    <label>Subscription Start Date</label><input type="date" id="newStart" onchange="updateSubAmountPreview()">
+    <label>Subscription End Date</label><input type="date" id="newEnd" onchange="updateSubAmountPreview()">
+    <div id="subAmountPreview" class="status" style="text-align:left;"></div>
+    <label>Payment Status</label>
+    <select id="newPaymentStatus" onchange="toggleNewPartialAmount()">
+      <option value="PAID">Paid in full</option>
+      <option value="PARTIAL">Paid partially</option>
+      <option value="CREDIT">Full credit (nothing paid yet)</option>
+    </select>
+    <div id="newPartialRow" style="display:none;">
+      <label>Amount Paid Now (₹)</label>
+      <input type="number" id="newAmountPaid" placeholder="0">
+    </div>
+    <div id="newMethodRow" style="display:block;">
+      <label>Payment Method</label>
+      <div class="type-row">
+        <div class="type-btn selected" id="newMethodCash" onclick="selectNewMethod('CASH')">💵 Cash</div>
+        <div class="type-btn" id="newMethodUpi" onclick="selectNewMethod('UPI')">📱 QR/UPI</div>
+      </div>
+    </div>
+    <button class="primary" onclick="addSubscriber()">Add Subscriber</button>
+    <div id="addSubResult"></div>
+  </div>
+
+  <div id="expensesPanel" class="card" style="display:none">
+    <table><thead><tr><th>Date</th><th>Description</th><th>Attendant</th><th>Amount</th></tr></thead>
+      <tbody id="expensesBody"></tbody></table>
+  </div>
+
+  <div id="exportPanel" class="card" style="display:none">
+    <label>From Date</label>
+    <input type="date" id="exportStart">
+    <label>To Date</label>
+    <input type="date" id="exportEnd">
+    <div style="font-size:13px; color:#aaa; margin-bottom:16px;">Maximum range: 31 days.</div>
+    <button class="primary" onclick="downloadReport()">⬇ Download Report (CSV)</button>
+    <div id="exportResult"></div>
+  </div>
+
+  <div id="displayPanel" class="card" style="display:none">
+    <label>Gate App Button Size</label>
+    <select id="settingButtonSize">
+      <option value="normal">Normal</option>
+      <option value="large">Large</option>
+      <option value="xl">Extra Large</option>
+    </select>
+    <label style="margin-top:16px; display:flex; align-items:center; gap:8px; text-transform:none;">
+      <input type="checkbox" id="settingMinimal" style="width:auto; margin:0;"> Minimalistic Design (gate app)
+    </label>
+    <label style="margin-top:16px;">Lot Capacity (optional — leave blank for unlimited)</label>
+    <input type="number" id="settingLotCapacity" placeholder="e.g. 40">
+    <button class="primary" onclick="saveDisplaySettings()" style="margin-top:16px;">Save Settings</button>
+    <div id="settingsResult"></div>
+    <div style="font-size:13px; color:#94A3B8; margin-top:12px;">Changes apply the next time the gate app is opened or refreshed on the attendant's phone.</div>
+  </div>
+
+  <div id="gatekeepersPanel" class="card" style="display:none">
+    <label>Create New Gatekeeper Account</label>
+    <input type="text" id="newGkUsername" placeholder="Username">
+    <input type="password" id="newGkPassword" placeholder="Password" style="margin-top:0;">
+    <button class="primary" onclick="createGatekeeper()">Create Account</button>
+    <div id="createGkResult"></div>
+    <hr style="border-color:#E2E8F0; margin:24px 0;">
+    <label>Existing Gatekeepers</label>
+    <table><thead><tr><th>Username</th><th>Created</th><th></th></tr></thead>
+      <tbody id="gatekeepersBody"></tbody></table>
+  </div>
+
+</div>
+
+<div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
+
+<script src="/admin.js?v=5"></script>
+</body>
+</html>

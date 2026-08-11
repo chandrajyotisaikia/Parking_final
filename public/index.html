@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Smart Gate Terminal</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#2563EB">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/style.css?v=5">
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">PARKPRO</div>
+    <div class="brand-sub">TULON'S PARKING</div>
+    <div class="tag">SMART GATE TERMINAL</div>
+  </div>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="container" style="max-width:380px; margin-top:60px;">
+  <div class="card">
+    <label>Gatekeeper Username</label>
+    <input type="text" id="loginUsername" placeholder="Your username">
+    <label>Password</label>
+    <input type="password" id="loginPassword" placeholder="Your password">
+    <button class="primary" onclick="gateLogin()">Login</button>
+    <div id="loginError" style="color:#DC2626; margin-top:10px;"></div>
+  </div>
+</div>
+
+<!-- MAIN APP (hidden until login) -->
+<div id="mainApp" class="container" style="display:none">
+
+  <div class="tabs">
+    <div class="tab active" id="tabGate" onclick="showTab('gate')">Gate Entry</div>
+    <div class="tab" id="tabExpense" onclick="showTab('expense')">Expenses</div>
+    <div class="tab" id="tabSub" onclick="showTab('sub')">Add Subscriber</div>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:13px;">
+    <span>Logged in as <strong id="loggedInUserLabel"></strong> · <a href="#" onclick="openChangePassword(); return false;" style="color:#2563EB;">Change Password</a> · <a href="#" onclick="gateLogout(); return false;" style="color:#DC2626;">Log Out</a></span>
+  </div>
+  <div style="text-align:right; margin-bottom:12px;">
+    <a href="/admin.html" style="color:#2563EB; font-size:13px;">Desktop CRM Dashboard →</a>
+  </div>
+
+  <div id="changePasswordCard" class="card" style="display:none;">
+    <label>Current Password</label>
+    <input type="password" id="oldPassword">
+    <label>New Password</label>
+    <input type="password" id="newPasswordField">
+    <button class="primary" onclick="submitChangePassword()">Update Password</button>
+    <button class="secondary" style="width:100%; margin-top:8px;" onclick="closeChangePassword()">Cancel</button>
+    <div id="changePasswordResult"></div>
+  </div>
+
+  <button class="scan" id="installBtn" style="display:none; background:#2563EB; color:#fff;" onclick="installApp()">📲 Install App on This Device</button>
+
+  <div id="parkedCounter" class="status" style="font-weight:800; font-size:16px;">🅿️ Currently Parked: —</div>
+
+  <!-- GATE ENTRY -->
+  <div id="gateSection">
+    <div class="card">
+      <label>Scan or Enter Plate</label>
+      <button class="scan" onclick="startScan()">📷 Scan Plate with Camera</button>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
+      <div class="status" id="ocrStatus"></div>
+
+      <input type="text" id="plateInput" placeholder="e.g. KA01AB1234" autocapitalize="characters" oninput="sanitizePlateInput(this)">
+
+      <label>Vehicle Type</label>
+      <div class="type-row">
+        <div class="type-btn selected" id="btnCar" onclick="selectType('CAR')">🚗 Car</div>
+        <div class="type-btn" id="btnBike" onclick="selectType('BIKE')">🏍️ Bike</div>
+      </div>
+      <div id="chargePreview" class="status" style="margin-top:0;"></div>
+
+      <button class="primary" onclick="checkIn()">✓ Check In Vehicle</button>
+
+      <div id="resultBox"></div>
+
+      <div id="paymentModal" style="display:none; margin-top:16px;" class="card">
+        <div id="paymentModalAmount" style="font-weight:800; margin-bottom:12px;"></div>
+        <button class="primary" style="margin-bottom:8px;" onclick="choosePaymentAndCheckIn('CASH')">💵 Collected — Cash</button>
+        <button class="primary" style="margin-bottom:8px; background:#3B82F6;" onclick="choosePaymentAndCheckIn('UPI')">📱 Collected — QR/UPI</button>
+        <button class="secondary" style="width:100%;" onclick="choosePaymentAndCheckIn('LATER')">⏳ Collect Later (busy right now)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <button class="secondary" style="width:100%; padding:16px; font-size:16px;" onclick="toggleExitPanel()">🚪 Mark Vehicle Exit</button>
+      <div id="exitPanel" style="display:none; margin-top:16px;">
+        <div class="status" id="exitStatus">Loading parked vehicles...</div>
+        <div id="exitList"></div>
+        <div id="exitPaymentModal" style="display:none; margin-top:12px;" class="card">
+          <div id="exitModalPlate" style="font-weight:800; margin-bottom:12px;"></div>
+          <button class="primary" style="margin-bottom:8px;" onclick="finalizeExit('CASH')">💵 Paid — Cash</button>
+          <button class="primary" style="margin-bottom:8px; background:#3B82F6;" onclick="finalizeExit('UPI')">📱 Paid — QR/UPI</button>
+          <button class="secondary" style="width:100%;" onclick="finalizeExit('UNPAID')">❌ Exit Without Payment (mark as due)</button>
+          <button class="secondary" style="width:100%; margin-top:8px; background:transparent;" onclick="cancelExitModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPENSES -->
+  <div id="expenseSection" style="display:none">
+    <div class="card">
+      <label>Amount (₹)</label>
+      <input type="number" id="expAmount" placeholder="0">
+      <label>Description</label>
+      <input type="text" id="expDesc" placeholder="e.g. Fuel, maintenance, snacks">
+      <label>Date</label>
+      <input type="date" id="expDate">
+      <button class="primary" onclick="submitExpense()">Log Expense</button>
+      <div id="expenseResult"></div>
+    </div>
+  </div>
+
+  <!-- ADD SUBSCRIBER -->
+  <div id="subSection" style="display:none">
+    <div class="card">
+      <label>Vehicle Number</label>
+      <input type="text" id="subPlate" placeholder="e.g. AB01CD2345" autocapitalize="characters" oninput="sanitizePlateInput(this)">
+      <div id="subPlateError" style="color:#DC2626; font-size:13px; margin-bottom:10px;"></div>
+      <label>Owner Name</label>
+      <input type="text" id="subOwner">
+      <label>Phone</label>
+      <input type="text" id="subPhone">
+      <label>Vehicle Type</label>
+      <div class="type-row">
+        <div class="type-btn selected" id="subBtnCar" onclick="selectSubType('CAR')">🚗 Car</div>
+        <div class="type-btn" id="subBtnBike" onclick="selectSubType('BIKE')">🏍️ Bike</div>
+      </div>
+      <label>Subscription Start Date</label>
+      <input type="date" id="subStart" onchange="updateSubAmountPreview()">
+      <label>Subscription End Date</label>
+      <input type="date" id="subEnd" onchange="updateSubAmountPreview()">
+      <div id="subAmountPreview" class="status" style="text-align:left;"></div>
+      <label>Payment Status</label>
+      <select id="subPaymentStatus" onchange="togglePartialAmount()">
+        <option value="PAID">Paid in full</option>
+        <option value="PARTIAL">Paid partially</option>
+        <option value="CREDIT">Full credit (nothing paid yet)</option>
+      </select>
+      <div id="subPartialRow" style="display:none;">
+        <label>Amount Paid Now (₹)</label>
+        <input type="number" id="subAmountPaid" placeholder="0">
+      </div>
+      <div id="subMethodRow" style="display:block;">
+        <label>Payment Method</label>
+        <div class="type-row">
+          <div class="type-btn selected" id="subMethodCash" onclick="selectSubMethod('CASH')">💵 Cash</div>
+          <div class="type-btn" id="subMethodUpi" onclick="selectSubMethod('UPI')">📱 QR/UPI</div>
+        </div>
+      </div>
+      <button class="primary" onclick="addSubscriberFromGate()">Add Subscriber</button>
+      <div id="subResult"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="/gate.js?v=5"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(() => console.log('Service worker registered'));
+}
+document.getElementById('expDate').valueAsDate = new Date();
+initGateLogin();
+updateChargePreview();
+applyDisplaySettings();
+
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (!isStandalone) document.getElementById('installBtn').style.display = 'block';
+});
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById('installBtn').style.display = 'none';
+}
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBtn').style.display = 'none';
+});
+</script>
+</body>
+</html>
