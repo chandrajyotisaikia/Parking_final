@@ -1,6 +1,6 @@
 // controllers/parking.controller.js — receives requests, calls services, sends responses
 const { pool } = require('../db/db');
-const { calculateCharge, calculateSubscriptionAmount } = require('../services/pricing.service');
+const { calculateCharge } = require('../services/pricing.service');
 const { checkSubscriber, addSubscriber, listSubscribers, listExpiringSubscribers } = require('../services/subscriber.service');
 const { addExpense, listExpenses, totalExpenses } = require('../services/expense.service');
 const { getSettings, updateSettings } = require('../services/settings.service');
@@ -64,6 +64,7 @@ async function verifyAndLog(req, res) {
       vehicleType: vehicleType.toUpperCase(),
       isSubscriber,
       subscriberName: subscriber ? subscriber.owner_name : null,
+      subscriberPhone: subscriber ? subscriber.phone : null,
       amount,
       entryTime: entry.entry_time,
       attendantName: attendantName || '',
@@ -100,34 +101,26 @@ const PLATE_REGEX = /^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$/;
 
 // POST /api/subscribers
 async function postSubscriber(req, res) {
-  const { vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, paymentStatus, amountPaid, paymentMethod } = req.body;
-  if (!vehicleNumber || !ownerName || !vehicleType || !subscriptionStart || !subscriptionEnd) {
+  const { vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, amountDue, paymentMethod } = req.body;
+  if (!vehicleNumber || !ownerName || !vehicleType || !subscriptionStart || !subscriptionEnd || !amountDue) {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
   const plate = vehicleNumber.toUpperCase().replace(/\s+/g, '');
   if (!PLATE_REGEX.test(plate)) {
     return res.status(400).json({ success: false, error: 'Vehicle number must be in format AB01CD2345' });
   }
+  const amount = parseFloat(amountDue);
+  if (isNaN(amount) || amount <= 0) {
+    return res.status(400).json({ success: false, error: 'Amount must be a positive number' });
+  }
   try {
-    const amountDue = calculateSubscriptionAmount(vehicleType, subscriptionStart, subscriptionEnd);
-    const status = paymentStatus || 'PAID';
-    let finalPaid = 0;
-    if (status === 'PAID') {
-      finalPaid = amountDue;
-    } else if (status === 'CREDIT') {
-      finalPaid = 0;
-    } else if (status === 'PARTIAL') {
-      finalPaid = parseFloat(amountPaid) || 0;
-      if (finalPaid <= 0 || finalPaid >= amountDue) {
-        return res.status(400).json({ success: false, error: 'Partial payment must be between 0 and the total amount due' });
-      }
-    }
-    // Encode the payment method into the same status field instead of a new column — e.g. "PAID/CASH", "PARTIAL/UPI"
+    // Amount is entered directly by the attendant/admin — not calculated from dates,
+    // since real-world subscription pricing varies (per client request).
     const method = paymentMethod === 'UPI' ? 'UPI' : 'CASH';
-    const storedStatus = status === 'CREDIT' ? 'CREDIT' : `${status}/${method}`;
+    const storedStatus = `PAID/${method}`; // subscriptions are always paid in full at registration
 
-    const sub = await addSubscriber({ vehicleNumber: plate, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, amountDue, amountPaid: finalPaid, paymentStatus: storedStatus });
-    return res.status(201).json({ success: true, subscriber: sub, amountDue, amountPaid: finalPaid, remaining: amountDue - finalPaid });
+    const sub = await addSubscriber({ vehicleNumber: plate, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, amountDue: amount, amountPaid: amount, paymentStatus: storedStatus });
+    return res.status(201).json({ success: true, subscriber: sub, amountDue: amount });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }
