@@ -1,10 +1,10 @@
-// db/db.js — Postgres connection (using a free Supabase database) + table setup.
+// db/db.js — Postgres connection (Render's own PostgreSQL) + table setup.
 // Reads the connection string from the DATABASE_URL environment variable.
 const { Pool } = require('pg');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // required for Supabase's hosted Postgres
+  ssl: { rejectUnauthorized: false },
 });
 
 async function initDb() {
@@ -18,13 +18,12 @@ async function initDb() {
       subscription_start DATE,
       subscription_end DATE NOT NULL,
       amount_due NUMERIC DEFAULT 0,
-      payment_status TEXT DEFAULT 'PAID'
+      payment_status TEXT DEFAULT 'CREDIT'
     );
-    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS subscription_start DATE;
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS amount_due NUMERIC DEFAULT 0;
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS amount_paid NUMERIC DEFAULT 0;
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'CREDIT';
-    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS amount_paid NUMERIC DEFAULT 0;
+
     CREATE TABLE IF NOT EXISTS daily_entries (
       id SERIAL PRIMARY KEY,
       vehicle_number TEXT NOT NULL,
@@ -34,14 +33,12 @@ async function initDb() {
       entry_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       exit_time TIMESTAMPTZ,
       status TEXT DEFAULT 'ACTIVE',
-      attendant_name TEXT
+      attendant_name TEXT,
+      payment_status TEXT
     );
     ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS exit_time TIMESTAMPTZ;
     ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS payment_status TEXT;
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );
+
     CREATE TABLE IF NOT EXISTS expenses (
       id SERIAL PRIMARY KEY,
       amount NUMERIC NOT NULL,
@@ -50,6 +47,12 @@ async function initDb() {
       attendant_name TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
