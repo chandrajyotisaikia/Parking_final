@@ -78,6 +78,19 @@ td { text-align: left; padding: 10px; border-bottom: 1px solid #EAF3FB; }
 .expense { color: #DC2626; }
 .net { color: #2563EB; }
 
+/* Loading spinner for buttons (e.g. "Logging in...") */
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Minimal mode — toggled from the admin dashboard's Display Settings tab */
 body.minimal .card { box-shadow: none; border-color: #DCE8F5; background: #FBFDFF; }
 body.minimal .type-btn.selected { background: #E7EFFC; color: #2563EB; border-color: #2563EB; }

@@ -6,10 +6,14 @@ function tryLogin() {
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
   const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
   if (!username || !password) {
     errEl.textContent = 'Please enter both username and password.';
     return;
   }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Logging in...';
+  errEl.textContent = '';
   fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -26,7 +30,8 @@ function tryLogin() {
       document.getElementById('dashboard').style.display = 'block';
       loadAll();
     })
-    .catch(() => { errEl.textContent = 'Could not reach the server — try again.'; });
+    .catch(() => { errEl.textContent = 'Could not reach the server — try again.'; })
+    .finally(() => { btn.disabled = false; btn.textContent = 'Login'; });
 }
 
 if (sessionStorage.getItem('adminLoggedIn') === 'true') {
@@ -153,8 +158,8 @@ async function loadSubscribers() {
   document.getElementById('subsBody').innerHTML = data.subscribers.map(s => {
     const expDate = new Date(s.subscription_end).toISOString().split('T')[0];
     const expired = expDate < today;
-    const statusColor = s.payment_status === 'CREDIT' ? 'color:#ef4444;' : 'color:#16A34A;';
-    return `<tr class="${expired ? 'expired' : ''}"><td>${s.vehicle_number}</td><td>${s.owner_name}</td><td>${s.phone || ''}</td><td>${expDate}</td><td>₹${s.amount_due || 0}</td><td style="${statusColor}">${s.payment_status === 'CREDIT' ? 'On Credit' : 'Paid'}</td></tr>`;
+    const method = (s.payment_status || '').split('/')[1] || '-';
+    return `<tr class="${expired ? 'expired' : ''}"><td>${s.vehicle_number}</td><td>${s.owner_name}</td><td>${s.phone || ''}</td><td>${expDate}</td><td>₹${s.amount_due || 0}</td><td>${method}</td></tr>`;
   }).join('');
 }
 
@@ -183,25 +188,6 @@ async function loadRenewalReminders() {
 
 // Subscription pricing preview — mirrors the server's rates so the admin sees the cost
 // before submitting. The server recalculates authoritatively, so this is display-only.
-const SUBSCRIPTION_MONTHLY_RATE = { CAR: 800, BIKE: 400 };
-
-function updateSubAmountPreview() {
-  const type = document.getElementById('newType').value;
-  const start = document.getElementById('newStart').value;
-  const end = document.getElementById('newEnd').value;
-  const el = document.getElementById('subAmountPreview');
-  if (!start || !end) { el.textContent = ''; return; }
-  const days = Math.max(1, Math.round((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24)) + 1);
-  if (days < 1) { el.textContent = 'End date must be after start date.'; return; }
-  const amount = Math.round((SUBSCRIPTION_MONTHLY_RATE[type] / 30) * days);
-  el.textContent = `💰 ${days} day(s) — Amount due: ₹${amount}`;
-}
-
-function toggleNewPartialAmount() {
-  const status = document.getElementById('newPaymentStatus').value;
-  document.getElementById('newPartialRow').style.display = status === 'PARTIAL' ? 'block' : 'none';
-  document.getElementById('newMethodRow').style.display = (status === 'PAID' || status === 'PARTIAL') ? 'block' : 'none';
-}
 
 let selectedNewMethod = 'CASH';
 function selectNewMethod(method) {
@@ -217,27 +203,23 @@ async function addSubscriber() {
   const vehicleType = document.getElementById('newType').value;
   const subscriptionStart = document.getElementById('newStart').value;
   const subscriptionEnd = document.getElementById('newEnd').value;
-  const paymentStatus = document.getElementById('newPaymentStatus').value;
-  const amountPaid = document.getElementById('newAmountPaid').value;
+  const amountDue = document.getElementById('newAmount').value;
   const resultEl = document.getElementById('addSubResult');
 
-  if (!vehicleNumber || !ownerName || !subscriptionStart || !subscriptionEnd) {
-    resultEl.innerHTML = `<div class="result paid">Please fill in plate, owner name, start date, and end date.</div>`;
+  if (!vehicleNumber || !ownerName || !subscriptionStart || !subscriptionEnd || !amountDue) {
+    resultEl.innerHTML = `<div class="result paid">Please fill in plate, owner name, dates, and amount.</div>`;
     return;
   }
   try {
     const res = await fetch('/api/subscribers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, paymentStatus, amountPaid, paymentMethod: selectedNewMethod }),
+      body: JSON.stringify({ vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, amountDue, paymentMethod: selectedNewMethod }),
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Unknown error');
-    resultEl.innerHTML = `<div class="result sub">Subscriber added. Due: ₹${data.amountDue} — Paid: ₹${data.amountPaid} — Remaining: ₹${data.remaining}</div>`;
-    ['newPlate','newOwner','newPhone','newStart','newEnd','newAmountPaid'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('subAmountPreview').textContent = '';
-    document.getElementById('newPaymentStatus').value = 'PAID';
-    toggleNewPartialAmount();
+    resultEl.innerHTML = `<div class="result sub">Subscriber added. Amount: ₹${data.amountDue} (Paid via ${selectedNewMethod}).</div>`;
+    ['newPlate','newOwner','newPhone','newStart','newEnd','newAmount'].forEach(id => document.getElementById(id).value = '');
     loadSubscribers();
     loadRenewalReminders();
   } catch (err) {

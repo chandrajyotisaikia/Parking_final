@@ -21,7 +21,7 @@
 <div class="header">
   <div>
     <div class="logo">PARKPRO</div>
-    <div class="brand-sub">TULON'S PARKING</div>
+    <div class="brand-sub">LIGANG ALOY PARKING</div>
     <div class="tag">ADMIN CRM DASHBOARD</div>
   </div>
   <a href="/" onclick="sessionStorage.setItem('skipDesktopRedirect','true')" style="color:#F5C518; font-size:13px;">← Gate Entry</a>
@@ -34,7 +34,7 @@
     <input type="text" id="loginUsername" placeholder="Username">
     <label>Admin Password</label>
     <input type="password" id="loginPassword" placeholder="Enter password">
-    <button class="primary" onclick="tryLogin()">Login</button>
+    <button class="primary" id="loginBtn" onclick="tryLogin()">Login</button>
     <div id="loginError" style="color:#DC2626; margin-top:10px;"></div>
   </div>
 </div>
@@ -82,7 +82,7 @@
   </div>
 
   <div id="subsPanel" class="card" style="display:none">
-    <table><thead><tr><th>Plate</th><th>Owner</th><th>Phone</th><th>Expires</th><th>Amount</th><th>Status</th></tr></thead>
+    <table><thead><tr><th>Plate</th><th>Owner</th><th>Phone</th><th>Expires</th><th>Amount</th><th>Payment</th></tr></thead>
       <tbody id="subsBody"></tbody></table>
   </div>
 
@@ -91,26 +91,15 @@
     <label>Owner Name</label><input type="text" id="newOwner">
     <label>Phone</label><input type="text" id="newPhone">
     <label>Vehicle Type</label>
-    <select id="newType" onchange="updateSubAmountPreview()"><option value="CAR">Car</option><option value="BIKE">Bike</option></select>
-    <label>Subscription Start Date</label><input type="date" id="newStart" onchange="updateSubAmountPreview()">
-    <label>Subscription End Date</label><input type="date" id="newEnd" onchange="updateSubAmountPreview()">
-    <div id="subAmountPreview" class="status" style="text-align:left;"></div>
-    <label>Payment Status</label>
-    <select id="newPaymentStatus" onchange="toggleNewPartialAmount()">
-      <option value="PAID">Paid in full</option>
-      <option value="PARTIAL">Paid partially</option>
-      <option value="CREDIT">Full credit (nothing paid yet)</option>
-    </select>
-    <div id="newPartialRow" style="display:none;">
-      <label>Amount Paid Now (₹)</label>
-      <input type="number" id="newAmountPaid" placeholder="0">
-    </div>
-    <div id="newMethodRow" style="display:block;">
-      <label>Payment Method</label>
-      <div class="type-row">
-        <div class="type-btn selected" id="newMethodCash" onclick="selectNewMethod('CASH')">💵 Cash</div>
-        <div class="type-btn" id="newMethodUpi" onclick="selectNewMethod('UPI')">📱 QR/UPI</div>
-      </div>
+    <select id="newType"><option value="CAR">Car</option><option value="BIKE">Bike</option></select>
+    <label>Subscription Start Date</label><input type="date" id="newStart">
+    <label>Subscription End Date</label><input type="date" id="newEnd">
+    <label>Subscription Amount (₹)</label>
+    <input type="number" id="newAmount" placeholder="e.g. 800">
+    <label>Payment Method</label>
+    <div class="type-row">
+      <div class="type-btn selected" id="newMethodCash" onclick="selectNewMethod('CASH')">💵 Cash</div>
+      <div class="type-btn" id="newMethodUpi" onclick="selectNewMethod('UPI')">📱 QR/UPI</div>
     </div>
     <button class="primary" onclick="addSubscriber()">Add Subscriber</button>
     <div id="addSubResult"></div>
@@ -162,7 +151,7 @@
 
 </div>
 
-<div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
+<div class="footer">© 2026 Ligang Aloy Parking — Built by Chandrajyoti Saikia</div>
 
 <script src="/admin.js?v=5"></script>
 </body>

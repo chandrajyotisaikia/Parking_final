@@ -50,10 +50,15 @@ async function gateLogin() {
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
   const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('gateLoginBtn');
   if (!username || !password) {
     errEl.textContent = 'Please enter both username and password.';
     return;
   }
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Logging in...';
+  errEl.textContent = '';
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -73,6 +78,9 @@ async function gateLogin() {
     refreshParkedCount();
   } catch (err) {
     errEl.textContent = 'Could not reach the server — try again.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 }
 
@@ -233,6 +241,7 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
 
 // ---- Check-in submit (two-step: compute charge → collect payment choice → save) ----
 let lastReceiptText = '';
+let lastReceiptData = null;
 let pendingCheckIn = null; // holds plate/type while waiting for a payment choice
 
 async function checkIn(skipDuplicateCheck) {
@@ -306,13 +315,15 @@ function finishCheckIn(data) {
   const resultBox = document.getElementById('resultBox');
   const cls = data.isSubscriber ? 'sub' : 'paid';
   const payLabel = data.isSubscriber ? 'Subscriber — free' : (data.paymentStatus === 'UNPAID' ? 'Payment: Collect Later' : `Payment: ${data.paymentStatus}`);
-  lastReceiptText = `TULON'S PARKING\nVehicle: ${data.vehicleNumber} (${data.vehicleType})\n${data.isSubscriber ? `Subscriber: ${data.subscriberName} - Free entry` : `Charge: Rs ${data.amount} (${data.paymentStatus})`}\nAttendant: ${data.attendantName || 'N/A'}\nTime: ${new Date(data.entryTime).toLocaleString('en-IN')}`;
+  lastReceiptText = `LIGANG ALOY PARKING\nVehicle: ${data.vehicleNumber} (${data.vehicleType})\n${data.isSubscriber ? `Subscriber: ${data.subscriberName} - Free entry` : `Charge: Rs ${data.amount} (${data.paymentStatus})`}\nAttendant: ${data.attendantName || 'N/A'}\nTime: ${new Date(data.entryTime).toLocaleString('en-IN')}`;
+  lastReceiptData = data;
 
   resultBox.innerHTML = `<div class="result ${cls}">
     ${data.vehicleNumber} — ${data.isSubscriber ? `Subscriber (${data.subscriberName}) — Free entry` : `Charge: ₹${data.amount}`}
     <div style="font-size:13px; font-weight:600; margin-top:4px;">${payLabel}</div>
-    <div style="margin-top:12px;">
-      <button class="secondary" onclick="shareReceipt()">📤 Share Receipt</button>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="secondary" onclick="generateReceiptPDF()">📄 Generate Receipt (PDF)</button>
+      <button class="secondary" onclick="shareReceipt()">📤 Share Text</button>
       ${data.entryId ? `<button class="secondary" id="undoBtn-${data.entryId}" onclick="undoEntry(${data.entryId})">↩ Undo</button>` : ''}
     </div>
   </div>`;
@@ -371,7 +382,7 @@ async function shareReceipt() {
   if (!lastReceiptText) return;
   if (navigator.share) {
     try {
-      await navigator.share({ title: "Tulon's Parking Receipt", text: lastReceiptText });
+      await navigator.share({ title: "Ligang Aloy Parking Receipt", text: lastReceiptText });
       return;
     } catch (err) {
       return; // user cancelled the share sheet
@@ -383,6 +394,98 @@ async function shareReceipt() {
   } catch (err) {
     alert(lastReceiptText);
   }
+}
+
+// Generates a formatted PDF receipt matching the client's paper receipt design, using jsPDF (free, client-side)
+async function generateReceiptPDF() {
+  if (!lastReceiptData) return;
+  const d = lastReceiptData;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: [320, 480] });
+
+  const pageW = 320;
+  const receiptNo = String(d.entryId || 0).padStart(6, '0');
+  const dateTime = new Date(d.entryTime).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  const feeText = d.isSubscriber ? 'FREE (Subscriber)' : `Rs ${d.amount}`;
+
+  // Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(15, 31, 61);
+  doc.text('LIGANG ALOY PARKING', pageW / 2, 34, { align: 'center' });
+  doc.setDrawColor(15, 31, 61);
+  doc.setLineWidth(1);
+  doc.line(30, 44, pageW - 30, 44);
+
+  doc.setFontSize(9);
+  doc.setTextColor(180, 30, 30);
+  doc.text(`Receipt No.`, pageW - 32, 20, { align: 'right' });
+  doc.setFontSize(11);
+  doc.text(receiptNo, pageW - 32, 32, { align: 'right' });
+
+  // Owner (if known — subscriber vehicles have this on file)
+  let y = 62;
+  doc.setTextColor(15, 31, 61);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Vehicle Owner: ${d.subscriberName || 'Walk-in Customer'}`, 30, y);
+  if (d.subscriberPhone) {
+    y += 16;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Phone: ${d.subscriberPhone}`, 30, y);
+  }
+
+  y += 20;
+  doc.setFillColor(15, 31, 61);
+  doc.rect(20, y, pageW - 40, 24, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PARKING RECEIPT', pageW / 2, y + 16, { align: 'center' });
+
+  y += 44;
+  const rows = [
+    ['Vehicle No.', d.vehicleNumber],
+    ['Vehicle Type', d.vehicleType === 'BIKE' ? 'Bike' : 'Car'],
+    ['Date & Time', dateTime],
+    ['Parking Fee', feeText],
+    ['Attendant', d.attendantName || '-'],
+  ];
+  doc.setTextColor(15, 31, 61);
+  rows.forEach(([label, value]) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(label, 30, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(value), pageW - 30, y, { align: 'right' });
+    doc.setDrawColor(210, 210, 210);
+    doc.line(30, y + 6, pageW - 30, y + 6);
+    y += 26;
+  });
+
+  y += 16;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(11);
+  doc.text('Thank You! — Visit Again', pageW / 2, y, { align: 'center' });
+  y += 16;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text('Drive Safe', pageW / 2, y, { align: 'center' });
+
+  const filename = `Receipt-${receiptNo}-${d.vehicleNumber}.pdf`;
+
+  // Try sharing the actual PDF file (Android Chrome supports this); fall back to a plain download
+  try {
+    const blob = doc.output('blob');
+    const file = new File([blob], filename, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    }
+  } catch (err) { /* fall through to download */ }
+
+  doc.save(filename);
 }
 
 // ---- Mark vehicle exit ----
@@ -516,31 +619,12 @@ async function submitExpense() {
 }
 
 // ---- Add Subscriber (from the gate app) ----
-const SUBSCRIPTION_MONTHLY_RATE = { CAR: 800, BIKE: 400 };
 let selectedSubType = 'CAR';
 
 function selectSubType(type) {
   selectedSubType = type;
   document.getElementById('subBtnCar').classList.toggle('selected', type === 'CAR');
   document.getElementById('subBtnBike').classList.toggle('selected', type === 'BIKE');
-  updateSubAmountPreview();
-}
-
-function updateSubAmountPreview() {
-  const start = document.getElementById('subStart').value;
-  const end = document.getElementById('subEnd').value;
-  const el = document.getElementById('subAmountPreview');
-  if (!start || !end) { el.textContent = ''; return; }
-  const days = Math.round((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24)) + 1;
-  if (days < 1) { el.textContent = 'End date must be on or after the start date.'; return; }
-  const amount = Math.round((SUBSCRIPTION_MONTHLY_RATE[selectedSubType] / 30) * days);
-  el.textContent = `💰 ${days} day(s) — Total amount due: ₹${amount}`;
-}
-
-function togglePartialAmount() {
-  const status = document.getElementById('subPaymentStatus').value;
-  document.getElementById('subPartialRow').style.display = status === 'PARTIAL' ? 'block' : 'none';
-  document.getElementById('subMethodRow').style.display = (status === 'PAID' || status === 'PARTIAL') ? 'block' : 'none';
 }
 
 let selectedSubMethod = 'CASH';
@@ -558,14 +642,13 @@ async function addSubscriberFromGate() {
   const phone = document.getElementById('subPhone').value.trim();
   const subscriptionStart = document.getElementById('subStart').value;
   const subscriptionEnd = document.getElementById('subEnd').value;
-  const paymentStatus = document.getElementById('subPaymentStatus').value;
-  const amountPaid = document.getElementById('subAmountPaid').value;
+  const amountDue = document.getElementById('subAmount').value;
   const errEl = document.getElementById('subPlateError');
   const resultEl = document.getElementById('subResult');
   errEl.textContent = '';
 
-  if (!vehicleNumber || !ownerName || !subscriptionStart || !subscriptionEnd) {
-    resultEl.innerHTML = `<div class="result paid">Please fill in plate, owner name, start date, and end date.</div>`;
+  if (!vehicleNumber || !ownerName || !subscriptionStart || !subscriptionEnd || !amountDue) {
+    resultEl.innerHTML = `<div class="result paid">Please fill in plate, owner name, dates, and amount.</div>`;
     return;
   }
   if (!PLATE_REGEX.test(vehicleNumber)) {
@@ -578,19 +661,14 @@ async function addSubscriberFromGate() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         vehicleNumber, ownerName, phone, vehicleType: selectedSubType,
-        subscriptionStart, subscriptionEnd, paymentStatus, amountPaid,
+        subscriptionStart, subscriptionEnd, amountDue,
         paymentMethod: selectedSubMethod,
       }),
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Unknown error');
-    resultEl.innerHTML = `<div class="result sub">
-      Subscriber added. Total due: ₹${data.amountDue} — Paid now: ₹${data.amountPaid} — Remaining: ₹${data.remaining}
-    </div>`;
-    ['subPlate','subOwner','subPhone','subStart','subEnd','subAmountPaid'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('subAmountPreview').textContent = '';
-    document.getElementById('subPaymentStatus').value = 'PAID';
-    togglePartialAmount();
+    resultEl.innerHTML = `<div class="result sub">Subscriber added. Amount: ₹${data.amountDue} (Paid via ${selectedSubMethod}).</div>`;
+    ['subPlate','subOwner','subPhone','subStart','subEnd','subAmount'].forEach(id => document.getElementById(id).value = '');
   } catch (err) {
     resultEl.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
   }
