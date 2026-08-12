@@ -401,30 +401,45 @@ async function generateReceiptPDF() {
   if (!lastReceiptData) return;
   const d = lastReceiptData;
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt', format: [320, 480] });
+  const doc = new jsPDF({ unit: 'pt', format: [320, 500] });
 
   const pageW = 320;
   const receiptNo = String(d.entryId || 0).padStart(6, '0');
-  const dateTime = new Date(d.entryTime).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  let dateTime = new Date(d.entryTime).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  dateTime = dateTime.replace(/am/i, 'AM').replace(/pm/i, 'PM'); // standardize casing for a formal document
   const feeText = d.isSubscriber ? 'FREE (Subscriber)' : `Rs ${d.amount}`;
 
-  // Header
+  // Payment mode — matters for reconciling cash vs UPI collections against this receipt later
+  let paymentMode = 'N/A (Subscriber)';
+  if (!d.isSubscriber) {
+    if (d.paymentStatus === 'UNPAID') paymentMode = 'Not Yet Collected';
+    else if (d.paymentStatus && d.paymentStatus.startsWith('PAID/')) paymentMode = d.paymentStatus.split('/')[1] === 'UPI' ? 'UPI / QR' : 'Cash';
+    else paymentMode = d.paymentStatus || '-';
+  }
+
+  // Row 1: Title, own row, auto-sized so it can never collide with anything else
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
+  let titleSize = 17;
+  doc.setFontSize(titleSize);
+  while (doc.getTextWidth('LIGANG ALOY PARKING') > pageW - 50 && titleSize > 10) {
+    titleSize -= 1;
+    doc.setFontSize(titleSize);
+  }
   doc.setTextColor(15, 31, 61);
-  doc.text('LIGANG ALOY PARKING', pageW / 2, 34, { align: 'center' });
+  doc.text('LIGANG ALOY PARKING', pageW / 2, 28, { align: 'center' });
+
   doc.setDrawColor(15, 31, 61);
   doc.setLineWidth(1);
-  doc.line(30, 44, pageW - 30, 44);
+  doc.line(30, 38, pageW - 30, 38);
 
-  doc.setFontSize(9);
+  // Row 2: Receipt No., its own row below the divider — no overlap possible
+  doc.setFontSize(10);
   doc.setTextColor(180, 30, 30);
-  doc.text(`Receipt No.`, pageW - 32, 20, { align: 'right' });
-  doc.setFontSize(11);
-  doc.text(receiptNo, pageW - 32, 32, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Receipt No. ${receiptNo}`, pageW - 30, 52, { align: 'right' });
 
   // Owner (if known — subscriber vehicles have this on file)
-  let y = 62;
+  let y = 72;
   doc.setTextColor(15, 31, 61);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
@@ -449,6 +464,7 @@ async function generateReceiptPDF() {
     ['Vehicle Type', d.vehicleType === 'BIKE' ? 'Bike' : 'Car'],
     ['Date & Time', dateTime],
     ['Parking Fee', feeText],
+    ['Payment Mode', paymentMode],
     ['Attendant', d.attendantName || '-'],
   ];
   doc.setTextColor(15, 31, 61);
@@ -466,12 +482,21 @@ async function generateReceiptPDF() {
   y += 16;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(11);
+  doc.setTextColor(15, 31, 61);
   doc.text('Thank You! — Visit Again', pageW / 2, y, { align: 'center' });
   y += 16;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
   doc.text('Drive Safe', pageW / 2, y, { align: 'center' });
+
+  // Signature / Stamp line — matches the physical receipt template
+  y += 40;
+  doc.setDrawColor(150, 150, 150);
+  doc.line(pageW - 130, y, pageW - 30, y);
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text('Signature / Stamp', pageW - 80, y + 12, { align: 'center' });
 
   const filename = `Receipt-${receiptNo}-${d.vehicleNumber}.pdf`;
 
